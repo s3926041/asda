@@ -2,11 +2,11 @@ const express = require("express");
 const mongoose = require("mongoose");
 const expressApp = express();
 const bodyParser = require("body-parser");
-
+const Student = require("./models/Student");
 const uri =
   "mongodb+srv://hieule0301:hieule0301@cluster02703.syx3xrh.mongodb.net/student-assistant?retryWrites=true&w=majority";
 
-mongoose
+mongoose 
   .connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
     console.log("Connected to MongoDB");
@@ -16,15 +16,7 @@ expressApp.use(bodyParser.urlencoded({ extended: true }));
 expressApp.use(bodyParser.json());
 
 // FOR THE STUDENTS COLLECTIONS
-const studentSchema = new mongoose.Schema({
-  name: String,
-  sid: String,
-  gender: String,
-  password: String,
-  course: Array,
-});
 
-const Student = new mongoose.model("students", studentSchema);
 
 expressApp.get("/students", async (req, res) => {
   try {
