@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,25 +6,29 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
+
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useIsFocused } from "@react-navigation/native";
-const ConversationScreen = ({ navigation,  }) => {
+import { useSocket } from "./SocketContext";
+import { format } from "timeago.js";
+
+const ConversationScreen = ({ navigation }) => {
+  const socket = useSocket();
   const [conversations, setConversation] = useState([]);
   const [lastMessage, setLastMessage] = useState([]);
   const [otherName, setOtherName] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
   const [arrivalMessage, setArrivalMessage] = useState(null);
-
-  const handleChatPress = (conversation) => {
-    // console.log(socket)
-    navigation.navigate("ChatScreen", {
-      conversation: conversation,
-      // socket: socket,
-    });
-  };
+  const [userId, setUserId] = useState("");
   const isFocused = useIsFocused();
+
+  useEffect(() => {
+    const getID = async () => {
+      const id = await AsyncStorage.getItem("currentID");
+      setUserId(id);
+    };
+    getID();
+  }, []);
   useEffect(() => {
     const url = "http://192.168.0.101:8000/conversations/";
     const getData = async () => {
@@ -39,13 +43,15 @@ const ConversationScreen = ({ navigation,  }) => {
         });
     };
     getData();
-  }, [navigation, isFocused]);
+  }, [navigation, isFocused, arrivalMessage]);
 
   useEffect(() => {
     setOtherName([]);
     setLastMessage([]);
     conversations.map((conversation) => fetch(conversation));
   }, [conversations]);
+
+  
 
   const fetch = async (conversation) => {
     const id = await AsyncStorage.getItem("currentID");
@@ -60,28 +66,66 @@ const ConversationScreen = ({ navigation,  }) => {
       "http://192.168.0.101:8000/messages/" + conversation._id
     );
     const name = data.data[0]?.name;
+    const text = data2.data[data2.data.length - 1]?.text;
+    const createdAt = data2.data[data2.data.length - 1]?.createdAt;
+    // console.log(createdAt);
     setLastMessage((prevState) => ({
       ...prevState,
-      [conversation._id]: data2.data[data2.data.length - 1]?.text,
+      [conversation._id]: { text, createdAt },
     }));
     setOtherName((prevState) => ({ ...prevState, [conversation._id]: name }));
   };
 
+  const handleChatPress = (conversation) => {
+    navigation.navigate("ChatScreen", {
+      conversation: conversation,
+    });
+  };
+  const sortedConversations = conversations.sort((a, b) => {
+    const lastMessageA = lastMessage[a._id];
+    const lastMessageB = lastMessage[b._id];
+
+    if (lastMessageA && lastMessageB) {
+      return (
+        new Date(lastMessageB.createdAt) - new Date(lastMessageA.createdAt)
+      );
+    } else if (lastMessageA) {
+      return -1;
+    } else if (lastMessageB) {
+      return 1;
+    } else {
+      return 0;
+    }
+  });
+
+  const formattedDate = (dateString) => {
+    return new Date(dateString).toLocaleString("en-US", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  };
   return (
     <ScrollView style={styles.container}>
-      {conversations.map((conversation, i) => (
+      {sortedConversations.map((conversation, i) => (
         <TouchableOpacity
           key={conversation._id}
           style={[styles.conversation]}
           onPress={() => handleChatPress(conversation)}
         >
-          <Text style={styles.conversationName}>
-            {" "}
-            {otherName[conversation._id] || "Loading..."}
-          </Text>
-          <Text style={styles.conversationLastMessage}>
-            {lastMessage[conversation._id] || "Loading..."}
-          </Text>
+          <View>
+            <Text style={styles.conversationName}>
+              {" "}
+              {otherName[conversation._id] || "Loading..."}
+            </Text>
+            <View>
+              <Text style={styles.conversationLastMessage}>
+                {lastMessage[conversation._id]?.text || "Loading..."}
+              </Text>
+              <Text style={styles.conversationTimestamp}>
+                {formattedDate(lastMessage[conversation._id]?.createdAt) || ""}
+              </Text>
+            </View>
+          </View>
         </TouchableOpacity>
       ))}
     </ScrollView>
@@ -100,7 +144,7 @@ const styles = StyleSheet.create({
   conversation: {
     borderColor: "#000",
     padding: 10,
-    backgroundColor: "#2196F3",
+    backgroundColor: "#fff",
     marginBottom: 10,
     borderRadius: 5,
   },
@@ -112,7 +156,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   conversationLastMessage: {
+    marginVertical: 2,
     fontSize: 14,
+  },
+  messageContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 });
 

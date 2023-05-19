@@ -48,7 +48,7 @@ router.get("/student/:userId", async (req, res) => {
   }
 });
 
-router.get("/deleteall",async(req,res)=>{
+router.delete("/deleteall",async(req,res)=>{
   const delC = await Conversation.deleteMany({})
   const delM = await Message.deleteMany({})
   res.status(200).json("deleted")
